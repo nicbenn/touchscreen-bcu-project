@@ -31,5 +31,5 @@ validators:
   online: false
 updates:
   enabled: true
-  repo: ""
+  repo: nicbenn/touchscreen-bcu-project
   branch: main

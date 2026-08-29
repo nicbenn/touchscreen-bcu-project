@@ -29,7 +29,7 @@ _DEFAULTS = {
     "validators": [{"id": 1, "link": "mock", "online": False}],
     "updates": {
         "enabled": True,
-        "repo": "",
+        "repo": "nicbenn/touchscreen-bcu-project",
         "branch": "main",
     },
 }
