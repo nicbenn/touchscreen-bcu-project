@@ -166,7 +166,10 @@ def create_app() -> Flask:
 
     @app.get("/api/update/check")
     def api_update_check():
-        return jsonify(updater.check())
+        try:
+            return jsonify(updater.check())
+        except Exception as exc:
+            return jsonify({"ok": True, "available": False, "message": str(exc)})
 
     @app.post("/api/update/apply")
     def api_update_apply():

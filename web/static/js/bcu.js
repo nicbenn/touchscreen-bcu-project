@@ -204,55 +204,46 @@
   async function runUpdateCheck() {
     show("update");
     setUpdateText("Searching for updates…");
-    let check = null;
+    const watchdog = setTimeout(() => {
+      if (currentScreen === "update") show("idle");
+    }, 8000);
     try {
-      check = await fetch("/api/update/check").then((r) => r.json());
-    } catch (_) {
-      setUpdateText("No network — continuing");
-      setTimeout(() => show("idle"), 900);
-      return;
+      const ctrl = new AbortController();
+      const abortTimer = setTimeout(() => ctrl.abort(), 5000);
+      let check = null;
+      try {
+        const res = await fetch("/api/update/check", { signal: ctrl.signal, cache: "no-store" });
+        check = await res.json();
+      } catch (_) {
+        check = { available: false };
+      }
+      clearTimeout(abortTimer);
+      if (check && check.available) {
+        setUpdateText("Installing update…");
+        try {
+          await post("/api/update/apply", {});
+        } catch (_) {
+          /* continue to Start shift even if the unit cannot apply yet */
+        }
+      }
+    } finally {
+      clearTimeout(watchdog);
+      if (currentScreen === "update" || currentScreen === "splash") show("idle");
     }
-    if (!check || !check.available) {
-      setUpdateText((check && check.message) || "Software is up to date");
-      setTimeout(() => show("idle"), 900);
-      return;
-    }
-    setUpdateText("Installing update…");
-    let applied = null;
-    try {
-      applied = await post("/api/update/apply", {});
-    } catch (_) {
-      setUpdateText("Update failed — continuing");
-      setTimeout(() => show("idle"), 1200);
-      return;
-    }
-    if (!applied || !applied.ok) {
-      setUpdateText((applied && applied.error) || "Update failed — continuing");
-      setTimeout(() => show("idle"), 1200);
-      return;
-    }
-    setUpdateText("Restarting…");
-    waitForRestart();
   }
 
   async function waitForRestart() {
-    for (let i = 0; i < 40; i++) {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      try {
-        const res = await fetch("/api/status", { cache: "no-store" });
-        if (res.ok) {
-          window.location.reload();
-          return;
-        }
-      } catch (_) {}
-    }
     show("idle");
   }
 
   function show(name) {
-    Object.values(screens).forEach((el) => el.classList.add("hidden"));
-    screens[name].classList.remove("hidden");
-    currentScreen = name;
+    const next = screens[name] || screens.idle;
+    if (!next) return;
+    next.classList.remove("hidden");
+    Object.values(screens).forEach((el) => {
+      if (el && el !== next) el.classList.add("hidden");
+    });
+    currentScreen = screens[name] ? name : "idle";
   }
 
   function openKeypad(title, mask, next, from, max) {
@@ -347,6 +338,7 @@
     paintValidators(data.validators || []);
     paintRunning(data);
 
+    if (currentScreen === "splash" || currentScreen === "update") return;
     if (data.trip && (currentScreen === "shift" || currentScreen === "idle")) show("running");
     if (!data.trip && currentScreen === "running") show("shift");
   }
@@ -377,10 +369,11 @@
     paintLate(trip, data.clock);
   }
 
-  function paintLate(trip, clock) {
+    function paintLate(trip, clock) {
     const bar = document.getElementById("run-late-bar");
     const label = document.getElementById("run-late-label");
-    bar.innerHTML = "";
+    if (!bar || !label) return;
+    bar.replaceChildren();
     let late = 0;
     if (trip && !Number(trip.trip_missing) && trip.trip_time && clock) {
       late = minutes(clock) - minutes(trip.trip_time);

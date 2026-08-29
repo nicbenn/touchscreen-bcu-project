@@ -5,7 +5,6 @@ import os
 import shutil
 import subprocess
 import sys
-import threading
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -22,16 +21,19 @@ GIT_CANDIDATES = [
 
 
 def check() -> dict:
-    cfg = (load_config().get("updates") or {})
-    if not cfg.get("enabled", True):
-        return {"ok": True, "available": False, "message": "Updates disabled"}
-    git = _git_bin()
-    if git and _is_git_checkout():
-        return _check_git(git, str(cfg.get("branch") or "main"))
-    repo = str(cfg.get("repo") or "").strip()
-    if repo:
-        return _check_github(repo, str(cfg.get("branch") or "main"))
-    return {"ok": True, "available": False, "message": "No update source configured"}
+    try:
+        cfg = (load_config().get("updates") or {})
+        if not cfg.get("enabled", True):
+            return {"ok": True, "available": False, "message": "Updates disabled"}
+        git = _git_bin()
+        if git and _is_git_checkout():
+            return _check_git(git, str(cfg.get("branch") or "main"))
+        repo = str(cfg.get("repo") or "").strip()
+        if repo:
+            return _check_github(repo, str(cfg.get("branch") or "main"))
+        return {"ok": True, "available": False, "message": "No update source configured"}
+    except Exception:
+        return {"ok": True, "available": False, "message": "Update check skipped"}
 
 
 def apply() -> dict:
@@ -42,7 +44,7 @@ def apply() -> dict:
     if not git or not _is_git_checkout():
         return {"ok": False, "error": "This unit is not a git checkout"}
     branch = str(cfg.get("branch") or "main")
-    fetched = _run(git, "fetch", "origin", branch)
+    fetched = _run(git, "fetch", "--quiet", "origin")
     if fetched.returncode != 0:
         return {"ok": False, "error": fetched.stderr.strip() or "Could not fetch updates"}
     pulled = _run(git, "merge", "--ff-only", f"origin/{branch}")
@@ -51,14 +53,12 @@ def apply() -> dict:
     _install_requirements()
     SHA_FILE.parent.mkdir(parents=True, exist_ok=True)
     SHA_FILE.write_text(_rev_parse(git, "HEAD") or "", encoding="utf-8")
-    RESTART_FLAG.write_text("1", encoding="utf-8")
-    threading.Timer(1.2, os._exit, [0]).start()
-    return {"ok": True, "restart": True, "message": "Update installed. Restarting…"}
+    return {"ok": True, "restart": False, "message": "Update installed"}
 
 
 def _check_git(git: str, branch: str) -> dict:
     current = _rev_parse(git, "HEAD")
-    fetched = _run(git, "fetch", "origin", branch)
+    fetched = _run(git, "fetch", "--quiet", "origin")
     if fetched.returncode != 0:
         return {
             "ok": True,
@@ -128,13 +128,18 @@ def _rev_parse(git: str, rev: str) -> str | None:
 def _run(git: str, *args: str) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["GIT_TERMINAL_PROMPT"] = "0"
-    return subprocess.run(
-        [git, "-C", str(ROOT), *args],
-        capture_output=True,
-        text=True,
-        timeout=45,
-        env=env,
-    )
+    env["GCM_INTERACTIVE"] = "Never"
+    env["GIT_ASKPASS"] = "echo"
+    try:
+        return subprocess.run(
+            [git, "-C", str(ROOT), *args],
+            capture_output=True,
+            text=True,
+            timeout=8,
+            env=env,
+        )
+    except subprocess.TimeoutExpired:
+        return subprocess.CompletedProcess(args=[git, *args], returncode=1, stdout="", stderr="timeout")
 
 
 def _install_requirements() -> None:
@@ -146,6 +151,6 @@ def _install_requirements() -> None:
         [python, "-m", "pip", "install", "-r", str(req)],
         capture_output=True,
         text=True,
-        timeout=120,
+        timeout=30,
         check=False,
     )
