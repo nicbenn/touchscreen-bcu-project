@@ -1,0 +1,35 @@
+unit_id: BCU Emulation
+software_version: 0.0.1 Beta
+timezone: Australia/Adelaide
+splash:
+  image: assets/splash.svg
+  duration_seconds: 5
+gps:
+  mode: auto
+  interval_seconds: 2
+  serial_port: /dev/ttyUSB0
+  baud: 9600
+network:
+  allowed_ssids:
+  - Depot-WiFi
+  - Metro-Ops
+  upload_url: ''
+  ntp_sync: true
+display:
+  brightness: 2
+  volume: 5
+operators:
+- badge: '7141'
+  pin: '8171'
+  name: Driver
+- badge: '12345'
+  pin: '0000'
+  name: Test Driver
+validators:
+- id: 1
+  link: mock
+  online: false
+updates:
+  enabled: true
+  repo: ""
+  branch: main

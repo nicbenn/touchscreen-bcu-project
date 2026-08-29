@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>BCU</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/bcu.css') }}">
+</head>
+<body>
+  <div id="bcu" class="bcu">
+    <section id="screen-splash" class="screen splash">
+      <img src="/splash" alt="Startup">
+    </section>
+
+    <section id="screen-update" class="screen hidden hatch">
+      <div class="update-body">
+        <div class="update-spinner"></div>
+        <div id="update-text">Searching for updates…</div>
+      </div>
+    </section>
+
+    <section id="screen-idle" class="screen hidden hatch">
+      <header class="status-bar">
+        <div class="status-left">
+          <div class="loc-row">
+            <span id="loc-icon" class="warn-dot">!</span>
+            <span id="loc-text">Location failure</span>
+          </div>
+          <div class="validator-row" id="validators-idle" title="Validators"></div>
+        </div>
+        <div class="status-right">
+          <div id="hdr-datetime">--/--/---- --:--</div>
+          <div id="hdr-gps" class="gps-bad">GPS</div>
+        </div>
+      </header>
+      <div class="idle-body">
+        <button type="button" class="pill-green start-shift" id="btn-start-shift">
+          <span class="power-icon"></span>
+          Start shift
+        </button>
+        <div class="unit-meta">
+          <div id="unit-line">{{ cfg.unit_id }} {{ cfg.software_version }}</div>
+          <div>Last Update</div>
+          <div id="last-update">{{ cfg.last_update }}</div>
+        </div>
+        <button type="button" class="admin-btn" id="btn-admin" aria-label="Settings">
+          <span class="icon-wrench"></span>
+          <span class="icon-lock"></span>
+        </button>
+      </div>
+      <footer class="footer-bar">
+        <div class="footer-left">
+          <button type="button" class="circle-btn" id="btn-ticket" aria-label="Tickets"></button>
+          <button type="button" class="circle-btn" id="btn-mail" aria-label="Messages">✉</button>
+        </div>
+        <div id="footer-clock" class="big-clock">--:--</div>
+      </footer>
+    </section>
+
+    <section id="screen-keypad" class="screen hidden pinstripe">
+      <div class="keypad-head">
+        <span class="prompt-tri"></span>
+        <span id="keypad-label">Shift number</span>
+        <span id="keypad-value"></span>
+      </div>
+      <div class="keypad-grid" id="keypad-grid"></div>
+      <footer class="keypad-footer">
+        <button type="button" class="circle-x" id="keypad-cancel">✕</button>
+        <button type="button" class="circle-back" id="keypad-back">◀</button>
+        <button type="button" class="pill-green ok-btn" id="keypad-ok">OK</button>
+      </footer>
+    </section>
+
+    <section id="screen-shift" class="screen hidden hatch">
+      <header class="status-bar">
+        <div class="status-left">
+          <div class="loc-row">
+            <span id="shift-loc-icon" class="warn-dot">!</span>
+            <span id="shift-loc-text">Location failure</span>
+          </div>
+          <div class="validator-row" id="validators-shift" title="Validators"></div>
+        </div>
+        <div class="status-right">
+          <div id="shift-datetime">--/--/---- --:--</div>
+          <div id="shift-gps" class="gps-bad">GPS</div>
+        </div>
+      </header>
+      <div class="shift-body">
+        <div class="shift-info" id="shift-info"></div>
+        <button type="button" class="pill-green" id="btn-start-trip">Start trip</button>
+        <canvas id="trace" width="640" height="180"></canvas>
+        <button type="button" class="pill-blue" id="btn-end-shift">End shift</button>
+      </div>
+      <footer class="footer-bar">
+        <div class="footer-left">
+          <button type="button" class="circle-btn" id="btn-ticket-2"></button>
+          <button type="button" class="circle-btn" id="btn-mail-2">✉</button>
+        </div>
+        <div id="shift-clock" class="big-clock">--:--</div>
+      </footer>
+    </section>
+
+    <section id="screen-pick" class="screen hidden pinstripe">
+      <div class="keypad-head">
+        <span class="prompt-tri"></span>
+        <span id="pick-label">Select route</span>
+      </div>
+      <div class="pick-list" id="pick-list"></div>
+      <footer class="keypad-footer">
+        <button type="button" class="circle-x" id="pick-cancel">✕</button>
+        <button type="button" class="pill-green ok-btn hidden" id="pick-missing">Trip missing</button>
+      </footer>
+    </section>
+
+    <section id="screen-running" class="screen hidden running">
+      <header class="run-header">
+        <div id="run-datetime">--/--/---- --:--</div>
+        <div id="run-gps" class="gps-bad">GPS</div>
+        <button type="button" class="run-tiny" id="run-lock" aria-label="Locked files"></button>
+      </header>
+      <div class="run-body">
+        <div class="run-col">
+          <button type="button" class="run-sq swap" id="run-swap" aria-label="Swap direction">⇄</button>
+          <button type="button" class="run-sq sale" id="run-sale">Sale</button>
+          <button type="button" class="run-sq quick" id="run-quick">Quick</button>
+        </div>
+        <div class="run-main">
+          <button type="button" class="run-chevron" id="run-prev">‹</button>
+          <div class="run-facts">
+            <div id="run-shift">Shift</div>
+            <div id="run-route">Route</div>
+            <div class="run-secdir">
+              <span id="run-sec">Sec.</span>
+              <span id="run-dir">Dir.</span>
+            </div>
+            <div id="run-dest" class="run-dest"></div>
+            <div class="run-late-row">
+              <div class="late-bar" id="run-late-bar"></div>
+              <span id="run-late-label"></span>
+            </div>
+          </div>
+          <button type="button" class="run-chevron" id="run-next">›</button>
+        </div>
+        <button type="button" class="run-bus" id="run-bus" aria-label="Vehicle"></button>
+      </div>
+      <footer class="run-footer">
+        <button type="button" class="pill-end" id="btn-end-trip">✕ End Trip</button>
+        <button type="button" class="pill-change" id="btn-change-route">⇄ Change Route</button>
+        <button type="button" class="admin-btn run-admin" id="btn-admin-run" aria-label="Settings">
+          <span class="icon-wrench"></span>
+          <span class="icon-lock"></span>
+        </button>
+        <div id="run-clock" class="big-clock">--:--</div>
+        <button type="button" class="circle-btn" id="btn-mail-run" aria-label="Messages">✉</button>
+        <button type="button" class="circle-btn stop-btn" id="btn-stop-run" aria-label="Stops"></button>
+      </footer>
+    </section>
+
+    <section id="screen-init" class="screen hidden pinstripe">
+      <div class="init-grid">
+        <div class="init-col">
+          <button type="button" class="menu-btn">Alarms</button>
+          <button type="button" class="menu-btn">Equipment data</button>
+          <button type="button" class="menu-btn" id="btn-test">Test equipment</button>
+        </div>
+        <button type="button" class="menu-btn tall" id="btn-adjust">
+          Adjust equipment
+          <span class="icon-wrench big"></span>
+        </button>
+      </div>
+      <footer class="nav-footer">
+        <button type="button" class="circle-x" id="init-close">✕</button>
+        <button type="button" class="pill-blue title-pill">Initialization</button>
+        <button type="button" class="circle-nav" id="init-next">◀ ▶</button>
+      </footer>
+    </section>
+
+    <section id="screen-adjust" class="screen hidden pinstripe">
+      <div class="adjust-row">
+        <span class="adj-icon sun"></span>
+        <button type="button" class="sq" id="bright-minus">−</button>
+        <div class="steps" id="bright-steps"></div>
+        <button type="button" class="sq" id="bright-plus">+</button>
+      </div>
+      <div class="adjust-row">
+        <span class="adj-icon speaker"></span>
+        <button type="button" class="sq" id="vol-minus">−</button>
+        <div class="steps" id="vol-steps"></div>
+        <button type="button" class="sq" id="vol-plus">+</button>
+      </div>
+      <footer class="nav-footer">
+        <button type="button" class="circle-x" id="adjust-cancel">✕</button>
+        <button type="button" class="pill-green ok-btn" id="adjust-ok">OK</button>
+      </footer>
+    </section>
+
+    <section id="screen-messages" class="screen hidden pinstripe">
+      <div class="msg-grid">
+        <button type="button" class="menu-btn">Concentrator call</button>
+        <button type="button" class="menu-btn">USB concentrator</button>
+        <button type="button" class="menu-btn">Sent messages</button>
+        <button type="button" class="menu-btn">Received messages</button>
+      </div>
+      <footer class="nav-footer">
+        <button type="button" class="circle-x" id="msg-close">✕</button>
+        <span></span>
+        <button type="button" class="circle-nav">◀ ▶</button>
+      </footer>
+    </section>
+  </div>
+  <script>
+    window.BCU_BOOT = {{ cfg | tojson }};
+  </script>
+  <script src="{{ url_for('static', filename='js/bcu.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+[Unit]
+Description=Touchscreen BCU
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/pi/Touchscreen-BCU-Project
+ExecStart=/home/pi/Touchscreen-BCU-Project/.venv/bin/python /home/pi/Touchscreen-BCU-Project/run.py
+Restart=always
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

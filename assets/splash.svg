@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1a4f8b"/>
+      <stop offset="100%" stop-color="#0d2a4a"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="480" fill="url(#bg)"/>
+  <circle cx="400" cy="188" r="78" fill="#f2c200"/>
+  <circle cx="400" cy="188" r="62" fill="#1a4f8b"/>
+  <path d="M360 210 L400 128 L440 210 Z" fill="#3aa35a"/>
+  <path d="M360 210 L400 168 L440 210 L400 248 Z" fill="#f2c200"/>
+  <rect x="250" y="176" width="300" height="36" rx="18" fill="#163a66"/>
+  <text x="400" y="200" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#fff">BCU</text>
+  <text x="400" y="300" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700" fill="#fff">Touchscreen BCU</text>
+  <text x="400" y="338" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="16" fill="#c9d8ea">Bus Control Unit</text>
+  <text x="400" y="430" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#8aa3c0">Replace assets/splash.svg before deploying an update</text>
+</svg>
