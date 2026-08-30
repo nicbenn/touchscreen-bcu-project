@@ -22,16 +22,16 @@
   let currentScreen = "splash";
   let lastGps = null;
   let lastStatus = null;
+  let netBusy = false;
+  let netNote = "";
+  let netNoteUntil = 0;
 
   show("splash");
-  setTimeout(() => {
-    if (currentScreen === "splash") runUpdateCheck();
-  }, (boot.splash_seconds || 5) * 1000);
   applyDisplay();
   buildKeypad();
   poll();
   setInterval(poll, 1000);
-  fetch("/api/sync", { method: "POST" }).catch(() => {});
+  bootNetworkThenContinue();
 
   document.getElementById("btn-start-shift").onclick = () => {
     draft = { shift_number: "", badge: "", pin: "" };
@@ -51,6 +51,7 @@
   document.getElementById("btn-admin-run").onclick = () => show("init");
   document.getElementById("init-close").onclick = () => show(lastStatus && lastStatus.trip ? "running" : lastStatus && lastStatus.shift ? "shift" : "idle");
   document.getElementById("init-next").onclick = () => show("messages");
+  document.getElementById("btn-net-connect").onclick = () => connectNetwork(false);
   document.getElementById("btn-adjust").onclick = () => {
     renderSteps();
     show("adjust");
@@ -201,6 +202,86 @@
     if (el) el.textContent = text;
   }
 
+  function setSplashNet(text, kind) {
+    const el = document.getElementById("splash-net");
+    if (!el) return;
+    el.textContent = text;
+    el.classList.toggle("warn", kind === "warn");
+    el.classList.toggle("ok", kind === "ok");
+  }
+
+  function setNetStatus(text, holdMs) {
+    const el = document.getElementById("net-status");
+    if (el) el.textContent = text;
+    if (holdMs) {
+      netNote = text;
+      netNoteUntil = Date.now() + holdMs;
+    }
+  }
+
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  async function bootNetworkThenContinue() {
+    const splashMs = (boot.splash_seconds || 5) * 1000;
+    const started = Date.now();
+    setSplashNet("Connecting to Wi-Fi…");
+    const result = await requestConnect(20000);
+    if (result.offline) {
+      setSplashNet(result.message || "No network found — continuing offline", "warn");
+      await sleep(1800);
+    } else {
+      setSplashNet(
+        result.message || (result.ssid ? "Connected to " + result.ssid : "Connected"),
+        result.connected ? "ok" : "warn"
+      );
+    }
+    const remain = splashMs - (Date.now() - started);
+    if (remain > 0) await sleep(remain);
+    fetch("/api/sync", { method: "POST" }).catch(() => {});
+    if (currentScreen === "splash") runUpdateCheck();
+  }
+
+  async function connectNetwork() {
+    if (netBusy) return;
+    const btn = document.getElementById("btn-net-connect");
+    netBusy = true;
+    if (btn) btn.disabled = true;
+    setNetStatus("Connecting to Wi-Fi…");
+    const result = await requestConnect(20000);
+    if (result.connected) {
+      setNetStatus(result.message || "Connected", 8000);
+      fetch("/api/sync", { method: "POST" }).catch(() => {});
+    } else {
+      setNetStatus(result.message || "No network found — continuing offline", 8000);
+    }
+    netBusy = false;
+    if (btn) btn.disabled = false;
+  }
+
+  async function requestConnect(timeoutMs) {
+    try {
+      const ctrl = new AbortController();
+      const abortTimer = setTimeout(() => ctrl.abort(), timeoutMs);
+      const res = await fetch("/api/network/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+        signal: ctrl.signal,
+        cache: "no-store",
+      });
+      clearTimeout(abortTimer);
+      return await res.json();
+    } catch (_) {
+      return {
+        connected: false,
+        offline: true,
+        message: "No network found — continuing offline",
+      };
+    }
+  }
+
   async function runUpdateCheck() {
     show("update");
     setUpdateText("Searching for updates…");
@@ -337,6 +418,13 @@
     document.getElementById("shift-info").textContent = info.join("  ·  ");
     paintValidators(data.validators || []);
     paintRunning(data);
+    if (!netBusy) {
+      if (Date.now() < netNoteUntil && netNote) {
+        setNetStatus(netNote);
+      } else {
+        setNetStatus(data.ssid ? "Connected to " + data.ssid : "Wi-Fi: offline");
+      }
+    }
 
     if (currentScreen === "splash" || currentScreen === "update") return;
     if (data.trip && (currentScreen === "shift" || currentScreen === "idle")) show("running");

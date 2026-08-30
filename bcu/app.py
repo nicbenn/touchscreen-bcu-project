@@ -17,7 +17,7 @@ from bcu import db
 from bcu import routes as routebook
 from bcu.config import ROOT, asset_path, load_config, save_display
 from bcu.gps import GpsService
-from bcu.network import maybe_upload, sync_system_clock, wifi_ssid
+from bcu.network import connect_configured, maybe_upload, network_status, sync_system_clock, wifi_ssid
 from bcu import updater
 from bcu.validators import snapshot as validator_snapshot
 
@@ -41,6 +41,7 @@ def create_app() -> Flask:
         return ("Internal error. See data/bcu-error.log", 500)
 
     db.init_db()
+    updater.start_origin_poll()
     gps_service.start()
     trip = db.active_trip()
     if trip:
@@ -86,7 +87,7 @@ def create_app() -> Flask:
                 "display": cfg["display"],
                 "unit_id": cfg["unit_id"],
                 "software_version": cfg["software_version"],
-                "last_update": cfg.get("_last_update") or _last_update_label(cfg, tz),
+                "last_update": _last_update_label(cfg, tz),
             }
         )
 
@@ -158,6 +159,17 @@ def create_app() -> Flask:
         cfg = save_display(body.get("brightness", 3), body.get("volume", 4))
         return jsonify({"ok": True, "display": cfg["display"]})
 
+    @app.get("/api/network")
+    def api_network():
+        return jsonify(network_status())
+
+    @app.post("/api/network/connect")
+    def api_network_connect():
+        result = connect_configured()
+        if result.get("connected"):
+            result["clock"] = sync_system_clock()
+        return jsonify(result)
+
     @app.post("/api/sync")
     def api_sync():
         clock = sync_system_clock()
@@ -201,6 +213,9 @@ def local_tz(cfg: dict):
 
 
 def _last_update_label(cfg: dict, tz) -> str:
+    git_label = updater.last_update_label(tz)
+    if git_label:
+        return git_label
     path = asset_path(cfg["splash"]["image"])
     if not path.exists():
         path = ROOT / "config.yaml"

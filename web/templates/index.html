@@ -10,6 +10,7 @@
   <div id="bcu" class="bcu">
     <section id="screen-splash" class="screen splash">
       <img src="/splash" alt="Startup">
+      <div id="splash-net" class="splash-net">Connecting to Wi-Fi…</div>
     </section>
 
     <section id="screen-update" class="screen hidden hatch">
@@ -162,12 +163,14 @@
           <button type="button" class="menu-btn">Alarms</button>
           <button type="button" class="menu-btn">Equipment data</button>
           <button type="button" class="menu-btn" id="btn-test">Test equipment</button>
+          <button type="button" class="menu-btn" id="btn-net-connect">Connect network</button>
         </div>
         <button type="button" class="menu-btn tall" id="btn-adjust">
           Adjust equipment
           <span class="icon-wrench big"></span>
         </button>
       </div>
+      <p id="net-status" class="net-status">Wi-Fi: checking…</p>
       <footer class="nav-footer">
         <button type="button" class="circle-x" id="init-close">✕</button>
         <button type="button" class="pill-blue title-pill">Initialization</button>

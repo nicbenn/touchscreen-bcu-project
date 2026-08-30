@@ -5,8 +5,11 @@ import os
 import shutil
 import subprocess
 import sys
+import threading
+import time
 import urllib.error
 import urllib.request
+from datetime import datetime
 from pathlib import Path
 
 from bcu.config import ROOT, load_config
@@ -18,6 +21,85 @@ GIT_CANDIDATES = [
     r"C:\Program Files\Git\cmd\git.exe",
     r"C:\Program Files (x86)\Git\cmd\git.exe",
 ]
+
+_label_cache: tuple[str, float] = ("", 0.0)
+_poll_started = False
+
+
+def last_update_label(tz) -> str:
+    """dd/mm/YYYY HH:MM of the latest commit on the git remote (or HEAD)."""
+    global _label_cache
+    now = time.monotonic()
+    cached, at = _label_cache
+    if cached and now - at < 15:
+        return cached
+    label = _format_commit_time(tz) or ""
+    _label_cache = (label, now)
+    return label
+
+
+def start_origin_poll() -> None:
+    global _poll_started
+    if _poll_started:
+        return
+    _poll_started = True
+    threading.Thread(target=_origin_poll_loop, name="git-origin", daemon=True).start()
+
+
+def _origin_poll_loop() -> None:
+    global _label_cache
+    while True:
+        time.sleep(120)
+        git = _git_bin()
+        if git and _is_git_checkout():
+            _run(git, "fetch", "--quiet", "origin")
+            _label_cache = ("", 0.0)
+
+
+def _format_commit_time(tz) -> str | None:
+    iso = _latest_commit_iso()
+    if not iso:
+        return None
+    try:
+        stamp = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return stamp.astimezone(tz).strftime("%d/%m/%Y %H:%M")
+
+
+def _latest_commit_iso() -> str | None:
+    cfg = load_config().get("updates") or {}
+    branch = str(cfg.get("branch") or "main")
+    git = _git_bin()
+    if git and _is_git_checkout():
+        return _commit_iso(git, f"origin/{branch}") or _commit_iso(git, "HEAD")
+    repo = str(cfg.get("repo") or "").strip()
+    if repo:
+        return _github_commit_iso(repo, branch)
+    return None
+
+
+def _commit_iso(git: str, rev: str) -> str | None:
+    result = _run(git, "log", "-1", "--format=%cI", rev)
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip() or None
+
+
+def _github_commit_iso(repo: str, branch: str) -> str | None:
+    url = f"https://api.github.com/repos/{repo}/commits/{branch}"
+    req = urllib.request.Request(
+        url, headers={"Accept": "application/vnd.github+json", "User-Agent": "touchscreen-bcu"}
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+    except Exception:
+        return None
+    return (
+        ((payload.get("commit") or {}).get("committer") or {}).get("date")
+        or ((payload.get("commit") or {}).get("author") or {}).get("date")
+    )
 
 
 def check() -> dict:
@@ -53,6 +135,8 @@ def apply() -> dict:
     _install_requirements()
     SHA_FILE.parent.mkdir(parents=True, exist_ok=True)
     SHA_FILE.write_text(_rev_parse(git, "HEAD") or "", encoding="utf-8")
+    global _label_cache
+    _label_cache = ("", 0.0)
     return {"ok": True, "restart": False, "message": "Update installed"}
 
 
@@ -67,6 +151,8 @@ def _check_git(git: str, branch: str) -> dict:
             "message": "Could not reach GitHub — continuing",
         }
     latest = _rev_parse(git, f"origin/{branch}")
+    global _label_cache
+    _label_cache = ("", 0.0)
     available = bool(current and latest and current != latest)
     return {
         "ok": True,

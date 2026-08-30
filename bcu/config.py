@@ -21,6 +21,7 @@ _DEFAULTS = {
     },
     "network": {
         "allowed_ssids": ["Depot-WiFi"],
+        "credentials": {},
         "upload_url": "",
         "ntp_sync": True,
     },

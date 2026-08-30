@@ -13,6 +13,9 @@ network:
   allowed_ssids:
   - Depot-WiFi
   - Metro-Ops
+  - Pixel_8714
+  credentials:
+    Pixel_8714: n1ch0las
   upload_url: ''
   ntp_sync: true
 display:
