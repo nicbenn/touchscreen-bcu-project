@@ -113,6 +113,12 @@ def create_app() -> Flask:
         shift = db.active_shift()
         if not shift:
             return jsonify({"ok": False, "error": "No active shift"}), 400
+        body = request.get_json(silent=True) or {}
+        pin = str(body.get("pin") or "").strip()
+        if not pin:
+            return jsonify({"ok": False, "error": "PIN required"}), 400
+        if not db.verify_operator(shift["badge"], pin):
+            return jsonify({"ok": False, "error": "Unknown badge or PIN"}), 401
         gps_service.set_active_trip(None)
         ended = db.end_shift(shift["id"])
         db.dump_shift_json(shift["id"])

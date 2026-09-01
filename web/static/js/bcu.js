@@ -51,7 +51,8 @@
   document.getElementById("btn-admin-run").onclick = () => show("init");
   document.getElementById("init-close").onclick = () => show(lastStatus && lastStatus.trip ? "running" : lastStatus && lastStatus.shift ? "shift" : "idle");
   document.getElementById("init-next").onclick = () => show("messages");
-  document.getElementById("btn-net-connect").onclick = () => connectNetwork(false);
+  const netConnect = document.getElementById("btn-net-connect");
+  if (netConnect) netConnect.onclick = () => connectNetwork(false);
   document.getElementById("btn-adjust").onclick = () => {
     renderSteps();
     show("adjust");
@@ -95,10 +96,7 @@
     show("shift");
     poll();
   };
-  document.getElementById("btn-end-shift").onclick = async () => {
-    await post("/api/shift/end", {});
-    show("idle");
-  };
+  document.getElementById("btn-end-shift").onclick = () => promptEndShiftPin();
   document.getElementById("pick-cancel").onclick = () => {
     pickState.onMissing = null;
     show(pickState.from || "shift");
@@ -368,6 +366,21 @@
       return;
     }
     show("shift");
+    poll();
+  }
+
+  function promptEndShiftPin() {
+    openKeypad("PIN number", true, (pin) => endShift(pin), "shift");
+  }
+
+  async function endShift(pin) {
+    const res = await post("/api/shift/end", { pin });
+    if (!res || !res.ok) {
+      promptEndShiftPin();
+      return;
+    }
+    draft = { shift_number: "", badge: "", pin: "" };
+    show("idle");
     poll();
   }
 
