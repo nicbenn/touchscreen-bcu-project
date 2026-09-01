@@ -9,6 +9,8 @@ ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = ROOT / "config.yaml"
 LOCAL_PATH = ROOT / "config.local.yaml"
 KIOSK_KEYS = ("unit_id", "timezone", "gps", "network", "display", "operators", "validators")
+# Never take these from config.local.yaml — they must follow git / config.yaml.
+TRACKED_KEYS = ("software_version", "splash")
 
 _DEFAULTS = {
     "unit_id": "CPE020",
@@ -49,7 +51,10 @@ def load_config() -> dict:
         with LOCAL_PATH.open("r", encoding="utf-8") as handle:
             local = yaml.safe_load(handle) or {}
         if isinstance(local, dict):
-            _deep_merge(data, local)
+            cleaned = _without_tracked(local)
+            if cleaned != local:
+                _dump_local(cleaned)
+            _deep_merge(data, cleaned)
     return data
 
 
@@ -68,6 +73,18 @@ def save_display(brightness: int, volume: int) -> dict:
     return cfg
 
 
+def _without_tracked(data: dict) -> dict:
+    cleaned = deepcopy(data)
+    for key in TRACKED_KEYS:
+        cleaned.pop(key, None)
+    return cleaned
+
+
+def _dump_local(data: dict) -> None:
+    with LOCAL_PATH.open("w", encoding="utf-8") as handle:
+        yaml.safe_dump(data, handle, sort_keys=False, allow_unicode=True)
+
+
 def _write_local(overlay: dict) -> None:
     existing: dict = {}
     if LOCAL_PATH.exists():
@@ -75,9 +92,9 @@ def _write_local(overlay: dict) -> None:
             loaded = yaml.safe_load(handle) or {}
         if isinstance(loaded, dict):
             existing = loaded
-    _deep_merge(existing, overlay)
-    with LOCAL_PATH.open("w", encoding="utf-8") as handle:
-        yaml.safe_dump(existing, handle, sort_keys=False, allow_unicode=True)
+    existing = _without_tracked(existing)
+    _deep_merge(existing, _without_tracked(overlay))
+    _dump_local(existing)
 
 
 def asset_path(relative: str) -> Path:
