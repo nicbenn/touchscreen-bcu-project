@@ -1,5 +1,5 @@
 unit_id: BCU Emulation
-software_version: 0.0.2 Beta
+software_version: 0.0.3 Beta
 timezone: Australia/Adelaide
 splash:
   image: assets/splash.svg
