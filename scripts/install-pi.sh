@@ -49,3 +49,4 @@ if command -v timedatectl >/dev/null; then
 fi
 
 echo "BCU installed. Reboot the Pi to open the kiosk."
+echo "Private GitHub updates: put a repo token in ${APP_DIR}/data/github.token"

@@ -2,7 +2,9 @@ name: Bump version
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+  workflow_dispatch:
 
 concurrency:
   group: bump-version
@@ -10,7 +12,7 @@ concurrency:
 
 jobs:
   bump:
-    if: ${{ !startsWith(github.event.head_commit.message, 'chore: bump version') }}
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     permissions:
       contents: write

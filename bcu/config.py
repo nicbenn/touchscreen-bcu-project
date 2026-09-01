@@ -7,6 +7,8 @@ import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = ROOT / "config.yaml"
+LOCAL_PATH = ROOT / "config.local.yaml"
+KIOSK_KEYS = ("unit_id", "timezone", "gps", "network", "display", "operators", "validators")
 
 _DEFAULTS = {
     "unit_id": "CPE020",
@@ -41,17 +43,41 @@ def load_config() -> dict:
     if CONFIG_PATH.exists():
         with CONFIG_PATH.open("r", encoding="utf-8") as handle:
             loaded = yaml.safe_load(handle) or {}
-        _deep_merge(data, loaded)
+        if isinstance(loaded, dict):
+            _deep_merge(data, loaded)
+    if LOCAL_PATH.exists():
+        with LOCAL_PATH.open("r", encoding="utf-8") as handle:
+            local = yaml.safe_load(handle) or {}
+        if isinstance(local, dict):
+            _deep_merge(data, local)
     return data
+
+
+def snapshot_kiosk_settings() -> None:
+    """Keep unit-specific settings out of git so kiosks can pull version bumps."""
+    cfg = load_config()
+    overlay = {key: deepcopy(cfg[key]) for key in KIOSK_KEYS if key in cfg}
+    _write_local(overlay)
 
 
 def save_display(brightness: int, volume: int) -> dict:
     cfg = load_config()
     cfg["display"]["brightness"] = max(1, min(5, int(brightness)))
     cfg["display"]["volume"] = max(1, min(5, int(volume)))
-    with CONFIG_PATH.open("w", encoding="utf-8") as handle:
-        yaml.safe_dump(cfg, handle, sort_keys=False, allow_unicode=True)
+    _write_local({"display": cfg["display"]})
     return cfg
+
+
+def _write_local(overlay: dict) -> None:
+    existing: dict = {}
+    if LOCAL_PATH.exists():
+        with LOCAL_PATH.open("r", encoding="utf-8") as handle:
+            loaded = yaml.safe_load(handle) or {}
+        if isinstance(loaded, dict):
+            existing = loaded
+    _deep_merge(existing, overlay)
+    with LOCAL_PATH.open("w", encoding="utf-8") as handle:
+        yaml.safe_dump(existing, handle, sort_keys=False, allow_unicode=True)
 
 
 def asset_path(relative: str) -> Path:

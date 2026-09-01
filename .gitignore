@@ -12,6 +12,9 @@ data/bcu-error.log
 data/shift-*.json
 data/.bcu-restart
 data/installed-sha.txt
+data/github.token
+data/update-last.json
+config.local.yaml
 .DS_Store
 Thumbs.db
 .env

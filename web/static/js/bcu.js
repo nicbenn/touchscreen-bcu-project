@@ -15,7 +15,7 @@
 
   let brightness = (boot.display && boot.display.brightness) || 3;
   let volume = (boot.display && boot.display.volume) || 4;
-  let keypad = { title: "Shift number", next: null, mask: false, value: "", from: "idle", max: 8 };
+  let keypad = { title: "Shift", next: null, mask: false, value: "", from: "idle", max: 8, alpha: false, tapKey: null, tapCount: 0, tapTimer: null };
   let draft = { shift_number: "", badge: "", pin: "" };
   let tripDraft = null;
   let pickState = { from: "shift", onMissing: null };
@@ -35,11 +35,11 @@
 
   document.getElementById("btn-start-shift").onclick = () => {
     draft = { shift_number: "", badge: "", pin: "" };
-    openKeypad("Shift number", false, (value) => {
+    openKeypad("Shift", false, (value) => {
       draft.shift_number = value;
-      openKeypad("Badge number", false, (badge) => {
+      openKeypad("Badge", false, (badge) => {
         draft.badge = badge;
-        openKeypad("PIN number", true, (pin) => {
+        openKeypad("PIN", true, (pin) => {
           draft.pin = pin;
           startShift();
         }, "idle");
@@ -78,6 +78,9 @@
   };
   document.getElementById("keypad-back").onclick = () => {
     keypad.value = keypad.value.slice(0, -1);
+    keypad.tapKey = null;
+    keypad.tapCount = 0;
+    if (keypad.tapTimer) clearTimeout(keypad.tapTimer);
     renderKeypadValue();
     beep();
   };
@@ -86,7 +89,19 @@
     const done = keypad.next;
     const value = keypad.value;
     keypad.value = "";
+    keypad.tapKey = null;
     if (done) done(value);
+  };
+  document.getElementById("keypad-abc").onclick = () => {
+    keypad.alpha = !keypad.alpha;
+    keypad.tapKey = null;
+    keypad.tapCount = 0;
+    if (keypad.tapTimer) clearTimeout(keypad.tapTimer);
+    const abc = document.getElementById("keypad-abc");
+    abc.classList.toggle("on", keypad.alpha);
+    abc.textContent = keypad.alpha ? "123" : "abc";
+    paintKeyLabels();
+    beep();
   };
 
   document.getElementById("btn-start-trip").onclick = () => beginTripSelect("shift");
@@ -113,13 +128,13 @@
 
   function beginTripSelect(from) {
     pickState.from = from;
-    openKeypad("Route number", false, (query) => chooseRoute(query, from), from, 6);
+    openKeypad("Route", false, (query) => chooseRoute(query, from), from, 6);
   }
 
   async function chooseRoute(query, from) {
     const matches = await fetchRoutes(query);
     if (!matches.length) {
-      openKeypad("Route number", false, (q) => chooseRoute(q, from), from, 6);
+      openKeypad("Route", false, (q) => chooseRoute(q, from), from, 6);
       return;
     }
     openPick("Select route", matches.map((route) => ({
@@ -285,25 +300,35 @@
     setUpdateText("Searching for updates…");
     const watchdog = setTimeout(() => {
       if (currentScreen === "update") show("idle");
-    }, 8000);
+    }, 180000);
     try {
       const ctrl = new AbortController();
-      const abortTimer = setTimeout(() => ctrl.abort(), 5000);
-      let check = null;
+      const abortTimer = setTimeout(() => ctrl.abort(), 90000);
+      let check = { available: false, message: "Could not search for updates" };
       try {
         const res = await fetch("/api/update/check", { signal: ctrl.signal, cache: "no-store" });
         check = await res.json();
       } catch (_) {
-        check = { available: false };
+        /* keep fallback message */
       }
       clearTimeout(abortTimer);
+      setUpdateText(check.message || (check.available ? "Update available" : "Software is up to date"));
+      await sleep(1800);
       if (check && check.available) {
         setUpdateText("Installing update…");
+        let applied = null;
         try {
-          await post("/api/update/apply", {});
+          applied = await post("/api/update/apply", {}, 120000);
         } catch (_) {
-          /* continue to Start shift even if the unit cannot apply yet */
+          applied = { ok: true, restart: true, message: "Update installed — restarting" };
         }
+        if (applied && applied.restart) {
+          setUpdateText(applied.message || "Restarting…");
+          await waitForRestart();
+          return;
+        }
+        setUpdateText((applied && (applied.error || applied.message)) || "Update could not be installed");
+        await sleep(2500);
       }
     } finally {
       clearTimeout(watchdog);
@@ -312,7 +337,18 @@
   }
 
   async function waitForRestart() {
-    show("idle");
+    for (let i = 0; i < 45; i += 1) {
+      await sleep(1000);
+      try {
+        const res = await fetch("/api/status", { cache: "no-store" });
+        if (res.ok) {
+          window.location.reload();
+          return;
+        }
+      } catch (_) {
+        /* service is restarting */
+      }
+    }
   }
 
   function show(name) {
@@ -325,9 +361,26 @@
     currentScreen = screens[name] ? name : "idle";
   }
 
+  const T9 = {
+    1: "1",
+    2: "ABC",
+    3: "DEF",
+    4: "GHI",
+    5: "JKL",
+    6: "MNO",
+    7: "PQRS",
+    8: "TUV",
+    9: "WXYZ",
+    0: " ",
+  };
+
   function openKeypad(title, mask, next, from, max) {
-    keypad = { title, next, mask, value: "", from, max: max || 8 };
-    document.getElementById("keypad-label").textContent = title;
+    if (keypad.tapTimer) clearTimeout(keypad.tapTimer);
+    keypad = { title, next, mask, value: "", from, max: max || 8, alpha: false, tapKey: null, tapCount: 0, tapTimer: null };
+    const abc = document.getElementById("keypad-abc");
+    abc.classList.remove("on");
+    abc.textContent = "abc";
+    paintKeyLabels();
     renderKeypadValue();
     show("keypad");
   }
@@ -339,27 +392,67 @@
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "key" + (n === 0 ? " key-zero" : "");
-      btn.textContent = String(n);
-      btn.onclick = () => {
-        if (keypad.value.length >= (keypad.max || 8)) return;
-        keypad.value += String(n);
-        renderKeypadValue();
-        beep();
-      };
+      btn.dataset.key = String(n);
+      btn.onclick = () => pressKey(n);
       grid.appendChild(btn);
     });
+    paintKeyLabels();
+  }
+
+  function paintKeyLabels() {
+    document.querySelectorAll("#keypad-grid .key").forEach((btn) => {
+      const n = Number(btn.dataset.key);
+      if (!keypad.alpha) {
+        btn.classList.remove("t9");
+        btn.textContent = String(n);
+        return;
+      }
+      btn.classList.add("t9");
+      const letters = n === 0 ? "␣" : T9[n];
+      btn.innerHTML = `<span class="t9-num">${n}</span><span class="t9-let">${letters}</span>`;
+    });
+  }
+
+  function pressKey(n) {
+    if (keypad.alpha) {
+      appendT9(n);
+      return;
+    }
+    if (keypad.value.length >= (keypad.max || 8)) return;
+    keypad.value += String(n);
+    renderKeypadValue();
+    beep();
+  }
+
+  function appendT9(n) {
+    const chars = T9[n] || String(n);
+    if (keypad.tapKey === n && keypad.tapTimer) {
+      clearTimeout(keypad.tapTimer);
+      keypad.tapCount = (keypad.tapCount + 1) % chars.length;
+      keypad.value = keypad.value.slice(0, -1) + chars[keypad.tapCount];
+    } else {
+      if (keypad.value.length >= (keypad.max || 8)) return;
+      keypad.tapKey = n;
+      keypad.tapCount = 0;
+      keypad.value += chars[0];
+    }
+    keypad.tapTimer = setTimeout(() => {
+      keypad.tapKey = null;
+    }, 900);
+    renderKeypadValue();
+    beep();
   }
 
   function renderKeypadValue() {
     const shown = keypad.mask ? "•".repeat(keypad.value.length) : keypad.value;
-    document.getElementById("keypad-value").textContent = shown;
+    document.getElementById("keypad-prompt").textContent = keypad.title + (shown ? " " + shown : "");
   }
 
   async function startShift() {
     const res = await post("/api/shift/start", draft);
     if (!res || !res.ok) {
       draft.pin = "";
-      openKeypad("PIN number", true, (pin) => {
+      openKeypad("PIN", true, (pin) => {
         draft.pin = pin;
         startShift();
       }, "idle");
@@ -370,7 +463,7 @@
   }
 
   function promptEndShiftPin() {
-    openKeypad("PIN number", true, (pin) => endShift(pin), "shift");
+    openKeypad("PIN", true, (pin) => endShift(pin), "shift");
   }
 
   async function endShift(pin) {
@@ -445,7 +538,7 @@
   }
 
   function paintValidators(list) {
-    ["validators-idle", "validators-shift"].forEach((id) => {
+    ["validators-idle", "validators-shift", "validators-run"].forEach((id) => {
       const row = document.getElementById(id);
       if (!row) return;
       row.replaceChildren();
@@ -472,21 +565,21 @@
 
     function paintLate(trip, clock) {
     const bar = document.getElementById("run-late-bar");
-    const label = document.getElementById("run-late-label");
-    if (!bar || !label) return;
+    if (!bar) return;
     bar.replaceChildren();
     let late = 0;
     if (trip && !Number(trip.trip_missing) && trip.trip_time && clock) {
       late = minutes(clock) - minutes(trip.trip_time);
     }
-    const shown = Math.max(0, Math.min(10, late));
-    for (let i = 1; i <= 10; i++) {
+    const pos = Math.max(-3, Math.min(3, Math.round(late / 2)));
+    for (let i = -3; i <= 3; i++) {
       const tick = document.createElement("div");
-      tick.className = "late-tick" + (i <= shown ? " on" : "");
-      tick.style.height = 8 + i * 1.4 + "px";
+      tick.className = "late-tick";
+      if (i === pos) {
+        tick.classList.add(late > 1 ? "late" : late < -1 ? "early" : "ontime");
+      }
       bar.appendChild(tick);
     }
-    label.textContent = late > 0 ? "+" + late : "";
   }
 
   function minutes(hhmm) {
@@ -610,16 +703,24 @@
     } catch (_) {}
   }
 
-  async function post(url, body) {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body || {}),
-    });
+  async function post(url, body, timeoutMs) {
+    const ctrl = new AbortController();
+    const abortTimer = timeoutMs ? setTimeout(() => ctrl.abort(), timeoutMs) : null;
     try {
-      return await res.json();
-    } catch (_) {
-      return { ok: false };
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body || {}),
+        signal: ctrl.signal,
+        cache: "no-store",
+      });
+      try {
+        return await res.json();
+      } catch (_) {
+        return { ok: false };
+      }
+    } finally {
+      if (abortTimer) clearTimeout(abortTimer);
     }
   }
 

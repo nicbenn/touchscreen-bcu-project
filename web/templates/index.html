@@ -61,14 +61,18 @@
     <section id="screen-keypad" class="screen hidden pinstripe">
       <div class="keypad-head">
         <span class="prompt-tri"></span>
-        <span id="keypad-label">Shift number</span>
-        <span id="keypad-value"></span>
+        <span id="keypad-prompt">Shift</span>
       </div>
       <div class="keypad-grid" id="keypad-grid"></div>
-      <footer class="keypad-footer">
-        <button type="button" class="circle-x" id="keypad-cancel">✕</button>
-        <button type="button" class="circle-back" id="keypad-back">◀</button>
+      <footer class="keypad-pad-foot">
+        <div class="keypad-nav">
+          <button type="button" class="circle-x" id="keypad-cancel" aria-label="Cancel">✕</button>
+          <button type="button" class="circle-back" id="keypad-back" aria-label="Backspace">
+            <span class="ico-back"></span>
+          </button>
+        </div>
         <button type="button" class="pill-green ok-btn" id="keypad-ok">OK</button>
+        <button type="button" class="circle-abc" id="keypad-abc">abc</button>
       </footer>
     </section>
 
@@ -114,46 +118,66 @@
     </section>
 
     <section id="screen-running" class="screen hidden running">
-      <header class="run-header">
-        <div id="run-datetime">--/--/---- --:--</div>
-        <div id="run-gps" class="gps-bad">GPS</div>
-        <button type="button" class="run-tiny" id="run-lock" aria-label="Locked files"></button>
+      <header class="status-bar run-status">
+        <div class="status-left">
+          <div class="validator-row" id="validators-run" title="Validators"></div>
+        </div>
+        <div class="status-right">
+          <div id="run-datetime">--/--/---- --:--</div>
+          <div class="run-gps-row">
+            <div id="run-gps" class="gps-bad">GPS</div>
+            <span class="hdr-bus" aria-hidden="true"></span>
+          </div>
+        </div>
       </header>
       <div class="run-body">
-        <div class="run-col">
-          <button type="button" class="run-sq swap" id="run-swap" aria-label="Swap direction">⇄</button>
+        <div class="run-pad">
           <button type="button" class="run-sq sale" id="run-sale">Sale</button>
+          <button type="button" class="run-sq swap" id="run-swap" aria-label="Swap direction">
+            <span class="ico-swap"></span>
+          </button>
+          <button type="button" class="run-sq lock" id="run-lock" aria-label="Validator lock">
+            <span class="ico-farebox"></span>
+          </button>
           <button type="button" class="run-sq quick" id="run-quick">Quick</button>
-        </div>
-        <div class="run-main">
-          <button type="button" class="run-chevron" id="run-prev">‹</button>
+          <button type="button" class="run-sq chev" id="run-prev" aria-label="Previous">
+            <span class="ico-chev left"></span>
+          </button>
           <div class="run-facts">
-            <div id="run-shift">Shift</div>
-            <div id="run-route">Route</div>
-            <div class="run-secdir">
+            <div class="run-fact-row">
+              <span id="run-shift">Shift</span>
               <span id="run-sec">Sec.</span>
+            </div>
+            <div class="run-fact-row">
+              <span id="run-route">Route</span>
               <span id="run-dir">Dir.</span>
             </div>
             <div id="run-dest" class="run-dest"></div>
-            <div class="run-late-row">
-              <div class="late-bar" id="run-late-bar"></div>
-              <span id="run-late-label"></span>
-            </div>
+            <div class="late-bar" id="run-late-bar"></div>
           </div>
-          <button type="button" class="run-chevron" id="run-next">›</button>
+          <button type="button" class="run-sq chev" id="run-next" aria-label="Next">
+            <span class="ico-chev right"></span>
+          </button>
         </div>
-        <button type="button" class="run-bus" id="run-bus" aria-label="Vehicle"></button>
       </div>
-      <footer class="run-footer">
-        <button type="button" class="pill-end" id="btn-end-trip">✕ End Trip</button>
-        <button type="button" class="pill-change" id="btn-change-route">⇄ Change Route</button>
+      <div class="run-actions">
+        <button type="button" class="pill-end" id="btn-end-trip">
+          <span class="end-x">✕</span> End Trip
+        </button>
+        <button type="button" class="pill-change" id="btn-change-route">
+          <span class="ico-swap"></span> Change Route
+        </button>
         <button type="button" class="admin-btn run-admin" id="btn-admin-run" aria-label="Settings">
           <span class="icon-wrench"></span>
           <span class="icon-lock"></span>
         </button>
+      </div>
+      <footer class="footer-bar run-foot">
+        <div class="footer-left">
+          <button type="button" class="circle-btn" id="btn-ticket-run" aria-label="Tickets"></button>
+          <button type="button" class="circle-btn" id="btn-mail-run" aria-label="Messages">✉</button>
+        </div>
         <div id="run-clock" class="big-clock">--:--</div>
-        <button type="button" class="circle-btn" id="btn-mail-run" aria-label="Messages">✉</button>
-        <button type="button" class="circle-btn stop-btn" id="btn-stop-run" aria-label="Stops"></button>
       </footer>
     </section>
 
