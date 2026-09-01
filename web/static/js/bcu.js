@@ -25,6 +25,8 @@
   let netBusy = false;
   let netNote = "";
   let netNoteUntil = 0;
+  let booting = true;
+  const HOLD_SCREENS = ["splash", "update", "keypad", "pick", "init", "adjust", "messages"];
 
   show("splash");
   applyDisplay();
@@ -49,7 +51,9 @@
 
   document.getElementById("btn-admin").onclick = () => show("init");
   document.getElementById("btn-admin-run").onclick = () => show("init");
-  document.getElementById("init-close").onclick = () => show(lastStatus && lastStatus.trip ? "running" : lastStatus && lastStatus.shift ? "shift" : "idle");
+  const adminShift = document.getElementById("btn-admin-shift");
+  if (adminShift) adminShift.onclick = () => show("init");
+  document.getElementById("init-close").onclick = () => resumeWorkScreen();
   document.getElementById("init-next").onclick = () => show("messages");
   const netConnect = document.getElementById("btn-net-connect");
   if (netConnect) netConnect.onclick = () => connectNetwork(false);
@@ -253,7 +257,11 @@
     const remain = splashMs - (Date.now() - started);
     if (remain > 0) await sleep(remain);
     fetch("/api/sync", { method: "POST" }).catch(() => {});
-    if (currentScreen === "splash") runUpdateCheck();
+    if (currentScreen === "splash" || currentScreen === "update") {
+      await runUpdateCheck();
+      return;
+    }
+    finishBoot();
   }
 
   async function connectNetwork() {
@@ -299,7 +307,7 @@
     show("update");
     setUpdateText("Searching for updates…");
     const watchdog = setTimeout(() => {
-      if (currentScreen === "update") show("idle");
+      if (currentScreen === "update" || currentScreen === "splash") finishBoot();
     }, 180000);
     try {
       const ctrl = new AbortController();
@@ -320,9 +328,9 @@
         try {
           applied = await post("/api/update/apply", {}, 120000);
         } catch (_) {
-          applied = { ok: true, restart: true, message: "Update installed — restarting" };
+          applied = { ok: false, message: "Update could not be installed" };
         }
-        if (applied && applied.restart) {
+        if (applied && applied.ok && applied.restart) {
           setUpdateText(applied.message || "Restarting…");
           await waitForRestart();
           return;
@@ -332,8 +340,23 @@
       }
     } finally {
       clearTimeout(watchdog);
-      if (currentScreen === "update" || currentScreen === "splash") show("idle");
+      if (currentScreen === "update" || currentScreen === "splash") finishBoot();
     }
+  }
+
+  function workScreen(data) {
+    if (data && data.trip) return "running";
+    if (data && data.shift) return "shift";
+    return "idle";
+  }
+
+  function resumeWorkScreen() {
+    show(workScreen(lastStatus));
+  }
+
+  function finishBoot() {
+    booting = false;
+    resumeWorkScreen();
   }
 
   async function waitForRestart() {
@@ -518,7 +541,7 @@
     }
     if (data.trip) info.push("Trip running — GPS logging");
     else if (data.shift) info.push("Ready to start trip");
-    if (data.gps && data.gps.ok) {
+    if (data.gps && data.gps.ok && Number.isFinite(data.gps.lat) && Number.isFinite(data.gps.lon)) {
       info.push(`${data.gps.lat.toFixed(5)}, ${data.gps.lon.toFixed(5)}`);
     }
     document.getElementById("shift-info").textContent = info.join("  ·  ");
@@ -532,9 +555,9 @@
       }
     }
 
-    if (currentScreen === "splash" || currentScreen === "update") return;
-    if (data.trip && (currentScreen === "shift" || currentScreen === "idle")) show("running");
-    if (!data.trip && currentScreen === "running") show("shift");
+    if (booting || HOLD_SCREENS.includes(currentScreen)) return;
+    const want = workScreen(data);
+    if (currentScreen !== want) show(want);
   }
 
   function paintValidators(list) {
@@ -719,6 +742,8 @@
       } catch (_) {
         return { ok: false };
       }
+    } catch (_) {
+      return { ok: false, error: "Request failed" };
     } finally {
       if (abortTimer) clearTimeout(abortTimer);
     }

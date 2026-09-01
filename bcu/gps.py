@@ -94,7 +94,10 @@ class GpsService:
                 self._fix = fix
                 trip_id = self._active_trip_id
             if trip_id and fix.ok:
-                db.add_gps_point(trip_id, fix.lat, fix.lon, fix.speed, fix.heading, fix.source)
+                try:
+                    db.add_gps_point(trip_id, fix.lat, fix.lon, fix.speed, fix.heading, fix.source)
+                except Exception:
+                    pass
 
     def _pick_reader(self, mode: str, cfg: dict) -> Callable[[], Fix]:
         if mode == "mock":

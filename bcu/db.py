@@ -239,7 +239,7 @@ def add_gps_point(trip_id: int, lat: float, lon: float, speed, heading, source: 
             INSERT INTO gps_points (trip_id, recorded_at, lat, lon, speed, heading, source)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (_now(), lat, lon, speed, heading, source),
+            (trip_id, _now(), lat, lon, speed, heading, source),
         )
         conn.commit()
 
